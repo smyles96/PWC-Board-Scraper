@@ -1,0 +1,9 @@
+env
+__pycache__
+crawledpdfs
+meetings
+pagejpgs
+gameplan.txt
+runtime_dump.json
+.vscode
+ocrtest.py
