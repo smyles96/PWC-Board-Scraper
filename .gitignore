@@ -2,8 +2,10 @@ env
 __pycache__
 crawledpdfs
 meetings
+meetings-redone
 pagejpgs
 gameplan.txt
 runtime_dump.json
 .vscode
 ocrtest.py
+geckodriver.log

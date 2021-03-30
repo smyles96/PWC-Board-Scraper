@@ -6,6 +6,7 @@ import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
+from selenium.common.exceptions import TimeoutException, WebDriverException
 
 MEETING_URL = "https://www.pwcgov.org/government/bocs/Pages/Meeting-Room.aspx"
 BRIEF_URL_TEMPLATE = "https://docs.google.com/gview?url=http://eservice.pwcgov.org/documents/bocs/briefs/{0}/{1}.pdf"
@@ -17,7 +18,7 @@ HEADERS = {
 }
 
 USER_AGENTS = [
-   #Chrome
+    #Chrome
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36',
     'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36',
     'Mozilla/5.0 (Windows NT 5.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36',
@@ -68,12 +69,14 @@ def crawl_meeting_links():
                     for span_tag in row_data[1].findAll('span'):
                         span_tag.replace_with('')
 
-                    # Format the date string from {Mon} {Day}, {Year} to {MonthNum}/{DayNum}/{Yeay}
+                    # Format the date string from {MonthName} {DayNum}, {Year} to {Year}-{MonthNum}-{DayNum}
                     meeting_date = datetime.datetime.strptime(row_data[1].text, '%b %d, %Y').strftime('%Y-%m-%d')
 
                     yield brief_link, meeting_date
 
 def crawl_resolution_links(brief_link):
+    """ Crawl a meeting's brief PDF for links to resolution PDFs """
+
     # The brief pdf is displayed in a Google Docs GView container. Since this container
     # generates dynamic HTML, a web driver must be used to get the final rendered HTML
     options = Options()
@@ -82,16 +85,16 @@ def crawl_resolution_links(brief_link):
 
     try:
         driver.get(brief_link)
-        # brief_request = requests.get(brief_url, headers = HEADERS)
 
-        #if brief_request.status_code == 200:
         soup = BeautifulSoup(driver.page_source, 'lxml')
-
         for resolution_pdf_tag in soup.find_all("a", attrs = {"class": "ndfHFb-c4YZDc-cYSp0e-DARUcf-hSRGPd", "href": True}):
             if ".pdf" in resolution_pdf_tag["href"]:
                 yield resolution_pdf_tag["href"]
     finally:
         driver.quit()
+
+def shutdown():
+    driver.quit()
 
 def download_pdf(pdf_link, download_folder):
     pdf_name = os.path.join(download_folder, "temp.pdf")
@@ -103,33 +106,8 @@ def download_pdf(pdf_link, download_folder):
         with open(pdf_name, "wb") as pdf_file:
             pdf_file.write(pdf_req.content)
 
-        print(f"    [*] PDF downloaded as {pdf_name}")
+        print(f"    [*] PDF downloaded from {pdf_link}")
     else:
         raise IOError(f"Unable to download PDF (error code [{pdf_req.status_code}] received)")
 
     return pdf_name
-
-if __name__ == "__main__":
-    for link in crawl_resolution_links("http://pwcgov.granicus.com/MinutesViewer.php?view_id=23&clip_id=2641"):
-        print(link)
-    # pdf_path = download_pdf("http://eservice.pwcgov.org/documents/bocs/briefs/2019/1210/res19-587.pdf", "crawledpdfs")
-
-    '''
-    num = 0
-
-    options = Options()
-    options.private = True
-    options.headless = True
-    # driver = webdriver.Firefox(options=options)
-
-    with webdriver.Firefox(options=options) as driver:
-        for link, date in crawl_meeting_links():
-            num += 1
-            print(f"[*] {date} -> {link}")
-
-            for res_link in crawl_resolution_links(date, driver):
-                print(f"\t{res_link}")
-
-            if num == 1:
-                break
-    '''

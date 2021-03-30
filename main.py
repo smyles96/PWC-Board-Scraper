@@ -22,21 +22,19 @@ def load_runtime():
 
     return runtime
 
-# If a runtime dump exists from the last crawl, load it and resume where the last
-# crawl ended
-runtime_dump = load_runtime()
-
 exception_counter = 0
 MAX_CONSECUTIVE_ERRORS = 5
-
 COMPLETE_ABORT = False
 
 print("[*] Starting crawl")
 
 # Get all the brief PDF links from the archive page
 try:
-    for meeting_link, meeting_date in crawler.crawl_meeting_links():
+    # If a runtime dump exists from the last crawl, load it and resume where the last
+    # crawl ended
+    runtime_dump = load_runtime()
 
+    for meeting_link, meeting_date in crawler.crawl_meeting_links():
         if meeting_date > runtime_dump["lastBrief"]:
             continue
 
@@ -56,12 +54,10 @@ try:
                 print(f"    [*] Attempting to download resolution PDF [{resolution_pdf_link}]")
 
                 # Download the PDF for a resolution
-                pdf_path = crawler.download_pdf(resolution_pdf_link, "crawledpdfs")
+                local_download_path = crawler.download_pdf(resolution_pdf_link, "crawledpdfs")
 
-                print("    [*] PDF downloaded")
                 print("    [*] Running OCR on downloaded PDF")
-
-                resolution_details = resminer.extract_resolution_details(pdf_path)
+                resolution_details = resminer.extract_resolution_details(resolution_pdf_link, local_download_path)
 
                 print("    [*] Appending resolution details to JSON", end = "\n\n")
                 meeting["resolutions"].append(resolution_details)
@@ -124,8 +120,10 @@ try:
         try:
             # Dump meeting info to file
             meeting_filename = "_".join(meeting_date.split("/")) + ".json"
-            with open( os.path.join("meetings",meeting_filename) , "w" ) as meeting_json_file:
-                json.dump(meeting, meeting_json_file, separators=(',', ':'))
+
+            with open( os.path.join("meetings-redone",meeting_filename) , "w" ) as meeting_json_file:
+                json.dump(meeting, meeting_json_file, indent=4, separators=(',', ':'))
+
         except Exception as e:
             print(f"  [!] Error dumping meeting file: {e}", end = "\n\n")
             errors.append({"type": "dump", "target": meeting_link, "reason": str(e)})
